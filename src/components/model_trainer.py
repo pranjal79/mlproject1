@@ -2,7 +2,7 @@ import os
 import sys
 from dataclasses import dataclass
 
-# ML Models
+# ML models
 from sklearn.ensemble import (
     AdaBoostRegressor,
     GradientBoostingRegressor,
@@ -13,7 +13,7 @@ from sklearn.metrics import r2_score
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
 
-# Custom Imports
+# Custom modules
 from src.pipeline.exception import CustomException
 from src.pipeline.logger import logging
 from src.pipeline.utils import save_object, evaluate_models
@@ -29,13 +29,10 @@ class ModelTrainer:
         self.model_trainer_config = ModelTrainerConfig()
 
     def initiate_model_trainer(self, train_array, test_array):
-        """
-        Trains multiple ML models, compares them using R² score, and saves the best model.
-        """
         try:
             logging.info("Splitting training and testing input data")
 
-            # ✅ Split arrays into features (X) and target (y)
+            # Split input and target features
             X_train, y_train, X_test, y_test = (
                 train_array[:, :-1],
                 train_array[:, -1],
@@ -43,7 +40,7 @@ class ModelTrainer:
                 test_array[:, -1],
             )
 
-            # ✅ Define models
+            # Models to evaluate
             models = {
                 "Random Forest": RandomForestRegressor(),
                 "Decision Tree": DecisionTreeRegressor(),
@@ -53,32 +50,32 @@ class ModelTrainer:
                 "AdaBoost Regressor": AdaBoostRegressor(),
             }
 
-            # ✅ Define hyperparameter grids
+            # Hyperparameter grids
             params = {
                 "Decision Tree": {
-                    "criterion": ["squared_error", "friedman_mse", "absolute_error"],
+                    "criterion": ["squared_error", "friedman_mse", "absolute_error", "poisson"],
                 },
                 "Random Forest": {
-                    "n_estimators": [32, 64, 128, 256],
+                    "n_estimators": [8, 16, 32, 64, 128, 256],
                 },
                 "Gradient Boosting": {
                     "learning_rate": [0.1, 0.05, 0.01],
-                    "n_estimators": [64, 128, 256],
                     "subsample": [0.7, 0.8, 0.9],
+                    "n_estimators": [32, 64, 128],
                 },
                 "Linear Regression": {},
                 "XGBRegressor": {
                     "learning_rate": [0.1, 0.05, 0.01],
-                    "n_estimators": [64, 128, 256],
+                    "n_estimators": [32, 64, 128],
                 },
                 "AdaBoost Regressor": {
-                    "learning_rate": [0.1, 0.05, 0.5],
+                    "learning_rate": [0.1, 0.05, 0.01],
                     "n_estimators": [32, 64, 128],
                 },
             }
 
-            # ✅ Evaluate all models
-            model_report: dict = evaluate_models(
+            # Evaluate all models (GridSearchCV inside utils.py)
+            model_report = evaluate_models(
                 X_train=X_train,
                 y_train=y_train,
                 X_test=X_test,
@@ -87,7 +84,7 @@ class ModelTrainer:
                 param=params,
             )
 
-            # ✅ Get best model
+            # Pick the best model based on R² score
             best_model_name = max(model_report, key=model_report.get)
             best_model_score = model_report[best_model_name]
             best_model = models[best_model_name]
@@ -95,27 +92,23 @@ class ModelTrainer:
             logging.info(f"Best model found: {best_model_name} (R² = {best_model_score:.3f})")
 
             if best_model_score < 0.6:
-                raise CustomException("No suitable model found (R² < 0.6)")
+                raise CustomException("No suitable model found with R² > 0.6")
 
-            # ✅ Train best model fully
-            best_model.fit(X_train, y_train)
-
-            # ✅ Save trained model
+            # Save best model
             save_object(
                 file_path=self.model_trainer_config.trained_model_file_path,
                 obj=best_model,
             )
 
-            # ✅ Evaluate best model on test data
-            predictions = best_model.predict(X_test)
-            r2_square = r2_score(y_test, predictions)
+            # Evaluate on test set
+            predicted = best_model.predict(X_test)
+            r2_square = r2_score(y_test, predicted)
 
             print("\n🎯 Best Model:", best_model_name)
-            print(f"✅ Test R² Score: {round(r2_square, 3)}")
-            print(f"💾 Model saved at: {self.model_trainer_config.trained_model_file_path}\n")
+            print("✅ Test R² Score:", round(r2_square, 3))
+            print(f"💾 Model saved at: {self.model_trainer_config.trained_model_file_path}")
 
             return r2_square
 
         except Exception as e:
-            logging.error(f"Error during model training: {e}")
             raise CustomException(e, sys)
