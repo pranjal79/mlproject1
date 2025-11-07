@@ -1,6 +1,7 @@
 import os
 import sys
 import dill
+import pickle
 from sklearn.metrics import r2_score
 from sklearn.model_selection import GridSearchCV
 from src.pipeline.exception import CustomException
@@ -74,5 +75,16 @@ def evaluate_models(X_train, y_train, X_test, y_test, models, param=None):
         print("\n🏁 Model evaluation completed!\n")
         return report
 
+    except Exception as e:
+        raise CustomException(e, sys)
+
+
+def load_object(file_path):
+    """
+    Loads and returns a Python object (model/preprocessor) from a pickle file.
+    """
+    try:
+        with open(file_path, "rb") as file:
+            return pickle.load(file)
     except Exception as e:
         raise CustomException(e, sys)
