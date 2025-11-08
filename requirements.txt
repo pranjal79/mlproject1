@@ -7,4 +7,6 @@ ipykernel
 catboost
 xgboost
 dill
+Flask==2.2.5
+gunicorn
 #-e .
